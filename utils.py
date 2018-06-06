@@ -43,20 +43,40 @@ def spliteAcc2fft(accs, splite_n, fs, timeserial=None, MAX_FREQ=None, is_draw_wa
     start = 0
 
     while start + splite_n < len(accs) - 1:
+        windowedData = hammingWindow * accs[start:start + splite_n]
 
-        windowDatas = hammingWindow * accs[start: start + splite_n]
-        X = np.fft.fft(windowDatas)
-        amplitudeSpectrum = [np.sqrt(c.real ** 2 + c.imag ** 2) for c in X]
+        if is_draw_wav == True:
+            fig = plt.figure(figure + " acc " + str(splite_n / fs))
+            plt.style.use("ggplot")
+            Y = accs[start:start + splite_n]
+            X = [timeserial + (start + i) / fs / 3600 / 24 for i in np.arange(len(windowedData))]
+            plt.plot(X, Y, c="b")
+            plt.ylim([-25, 25])
+            fig.show()
+            is_draw_wav = False
+
+        X = np.fft.fft(windowedData)  # FFT
+        amplitudeSpectrum = [np.sqrt(c.real ** 2 + c.imag ** 2) for c in X]  # 振幅スペクトル
         amplitudes = np.array(amplitudeSpectrum)[indexes]
         datas.append(amplitudes)
 
-        start+= splite_n
+        if is_draw_fft == True:
+            fig = plt.figure(figure + " acc fft " + str(splite_n / fs))
+            plt.style.use("ggplot")
+            X = freqs[indexes]
+            Y = amplitudes
+            plt.plot(X, Y, c="b")
+            plt.ylim([0, 5250])
+            fig.show()
+            is_draw_fft = False
+
+        start += splite_n
     datas = np.array(datas)
+
     return datas
 
-
 # global val
-dataset_path = 'data/dataset_2018_04_26/'
+dataset_path = './data/dataset_2018_04_26/'
 normal_position1_data_path = dataset_path + 'normal_position1/'
 normal_position2_data_path = dataset_path + 'normal_position2/'
 bearing_position1_data_path = dataset_path + 'bearing_position1/'
@@ -71,19 +91,19 @@ if __name__ == "__main__":
     fp = FontProperties(fname=r'/System/Library/Fonts/ヒラギノ明朝 ProN.ttc', size=9)
 
     accs = merageVm2012Data(normal_position1_data_path + '/' + csv_file_regular_expression)
-    print("Normal position 1 : " , accs.shape)
+    print("Normal position 1 : " , accs.size)
 
     accs = merageVm2012Data(bearing_position1_data_path + '/' + csv_file_regular_expression)
-    print("Bearing position 1 : " , accs.shape)
+    print("Bearing position 1 : " , accs.size)
 
     accs = merageVm2012Data(gear_position1_data_path + '/' + csv_file_regular_expression)
-    print("Gear position 1 : " , accs.shape)
+    print("Gear position 1 : " , accs.size)
 
     accs = merageVm2012Data(normal_position2_data_path + '/' + csv_file_regular_expression)
-    print("Normal position 2 : " , accs.shape)
+    print("Normal position 2 : " , accs.size)
 
     accs = merageVm2012Data(bearing_position2_data_path + '/' + csv_file_regular_expression)
-    print("Bearing position 2 : " , accs.shape)
+    print("Bearing position 2 : " , accs.size)
 
     accs = merageVm2012Data(gear_position2_data_path + '/' + csv_file_regular_expression)
-    print("Gear position 2 : " , accs.shape)
+    print("Gear position 2 : " , accs.size)
