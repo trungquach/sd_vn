@@ -14,9 +14,9 @@ if __name__ == '__main__':
     split_N = 1024 * 2
     batch_size = 100
 
-    normal_accs = utils.merageVm2012Data(utils.normal_position1_data_path + '/' + utils.csv_file_regular_expression)
-    bearing_accs = utils.merageVm2012Data(utils.bearing_position1_data_path + '/' + utils.csv_file_regular_expression)
-    gear_accs = utils.merageVm2012Data(utils.gear_position1_data_path + '/' + utils.csv_file_regular_expression)
+    normal_accs = utils.merageVm2012Data(utils.normal_position2_data_path + '/' + utils.csv_file_regular_expression)
+    bearing_accs = utils.merageVm2012Data(utils.bearing_position2_data_path + '/' + utils.csv_file_regular_expression)
+    gear_accs = utils.merageVm2012Data(utils.gear_position2_data_path + '/' + utils.csv_file_regular_expression)
 
 
     normal_datas = utils.spliteAcc2fft(accs=normal_accs, splite_n=split_N, fs=utils.freq)

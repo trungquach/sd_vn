@@ -4,9 +4,10 @@
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 
+
 class VAE:
     def __init__(self, input_dim, enc_hid_dim, n_enc_layer, latent_dim, dec_hid_dim, n_dec_layer,
-                 init_lr, n_sample, beta, **kargs):
+                 init_lr, n_sample, beta, use_batch_norm, **kargs):
         self.input_dim = input_dim
 
         self.enc_hid_dim = enc_hid_dim
@@ -21,6 +22,19 @@ class VAE:
         self.n_sample = n_sample # not use yet
 
         self.beta = beta
+        self.use_batch_norm = use_batch_norm
+
+    def batch_normalize(self, data, scope, phase):
+
+        norm_data = tf.contrib.layers.batch_norm(
+            data,
+            decay=0.9,
+            center=True,
+            scale=True,
+            is_training=phase,
+            scope=scope)
+
+        return norm_data
 
     def __build_layer(self, input, input_dim, output_dim, act_func = lambda x: x, name_scope = 'vae_'):
         with tf.variable_scope(name_scope):
@@ -43,6 +57,9 @@ class VAE:
                 if i_layer == 0:
                     a = self.__build_layer(input=input,input_dim=input_dim,output_dim=enc_hid_dim,act_func=tf.nn.elu,
                                            name_scope='encoder_layer_%d' % i_layer)
+                    # batch normalization
+                    if self.use_batch_norm is True:
+                        a = self.batch_normalize(data=a,scope='encoder_layer_bn_%d' % i_layer,phase=self.phase)
                 else:
                     a = self.__build_layer(input=a, input_dim=enc_hid_dim, output_dim=enc_hid_dim, act_func=tf.nn.elu,
                                            name_scope='encoder_layer_%d' % i_layer)
@@ -65,9 +82,11 @@ class VAE:
             # build multi layers
             for i_layer in range(n_dec_layer):
                 if i_layer == 0:
-
                     a = self.__build_layer(input=input, input_dim=input_dim,output_dim=dec_hid_dim,
                                            act_func=tf.nn.elu, name_scope='decoder_layer_%d' % i_layer)
+                    # batch normalization
+                    if self.use_batch_norm:
+                        a = self.batch_normalize(data=a, scope='decoder_layer_bn_%d' % i_layer, phase=self.phase)
                 else:
                     a = self.__build_layer(input=a, input_dim=dec_hid_dim, output_dim=dec_hid_dim, act_func=tf.nn.elu,
                                            name_scope='decoder_layer_%d' % i_layer)
@@ -94,8 +113,9 @@ class VAE:
     def __build_placeholder(self, input_dim, init_lr):
         input = tf.placeholder(name='input',dtype=tf.float32,shape=[None,input_dim])
         lr = tf.placeholder_with_default(input=init_lr,shape=[],name='lr_with_default')
+        phase = tf.placeholder_with_default(input=False,shape=[],name='phase_with_default')
 
-        return input, lr
+        return input, lr, phase
 
     def build_normalize(self, train_data):
         self.scaler = MinMaxScaler()
@@ -110,7 +130,8 @@ class VAE:
     def batch_train(self, batch_data, lr):
         feed_dict = {
             self.input: batch_data,
-            self.lr: lr
+            self.lr: lr,
+            self.phase: 1
         }
 
         loss, _ = self.sess.run([self.vae_loss,self.train_step],feed_dict)
@@ -126,13 +147,21 @@ class VAE:
 
         return decoded_output
 
+    def save(self, save_path):
+        self.saver.save(self.sess, save_path)
+
+    def restore(self, restore_path):
+        self.saver.restore(self.sess, restore_path)
+
     def build(self):
         # build necessary placeholders
-        self.input, self.lr = self.__build_placeholder(input_dim=self.input_dim, init_lr=self.init_lr)
+        self.input, self.lr, self.phase = self.__build_placeholder(input_dim=self.input_dim, init_lr=self.init_lr)
 
         # encoder == approximate q(z|X)
         self.mu, self.var = self.__build_encoder(input=self.input,input_dim=self.input_dim,enc_hid_dim=self.enc_hid_dim,
                                                      n_enc_layer=self.n_enc_layer,latent_dim=self.latent_dim)
+
+
 
         # sampling
         self.zs = self.__sample(mu=self.mu,var=self.var)
@@ -151,9 +180,13 @@ class VAE:
         self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.lr).minimize(self.vae_loss)
 
         # session
+        self.saver = tf.train.Saver()
+
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
+
+
 
 if __name__ == '__main__':
     # test
@@ -171,8 +204,11 @@ if __name__ == '__main__':
     init_lr = 0.001
     n_sample = 2
     beta = 0.0
+    use_batch_norm = False
 
     vae = VAE(input_dim=input_dim, enc_hid_dim=enc_hid_dim, n_enc_layer=n_enc_layer, latent_dim=latent_dim,
-              dec_hid_dim=dec_hid_dim, n_dec_layer=n_dec_layer, init_lr=init_lr, n_sample=n_sample, beta=beta)
+              dec_hid_dim=dec_hid_dim, n_dec_layer=n_dec_layer, init_lr=init_lr, n_sample=n_sample, beta=beta,
+              use_batch_norm=use_batch_norm)
+
     vae.build()
 
