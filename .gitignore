@@ -1,1 +1,4 @@
 /data/dataset_2018_04_26/*
+/saved_model/*
+/.idea/*
+/__pycache__/*

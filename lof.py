@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.neighbors import LocalOutlierFactor
 from matplotlib.font_manager import FontProperties
-from sklearn.metrics import roc_curve, auc, roc_auc_score
+from sklearn.metrics import roc_curve, auc, roc_auc_score, f1_score
 from sklearn.externals import joblib
 
 # merage vm2012 log format data
@@ -73,6 +73,24 @@ gear_position2_data_path = dataset_path + 'gear_position2/'
 csv_file_regular_expression = '*.wdat'
 freq = 100000
 N = 1024 * 2
+use_data_test = True
+
+def _init_data(input, is_use_data_test=True, rate = 0.7):
+    if is_use_data_test:
+        no_row_test_normal = (int)(input[0].shape[0] * rate)
+        datas_train = np.r_(input[0][:no_row_test_normal], input[1], input[2])
+        datas_test = input[0][-no_row_test_normal:]
+
+        ground_truth = np.zeros(datas_test.shape[0], dtype=int)
+        ground_truth[-(input[1].shape[0] + input[2].shape[0]):] = 1
+    else:
+        datas_train = np.r_(input)
+        ground_truth = np.zeros(datas_train.shape[0], dtype=int)
+        ground_truth[-(input[1].shape[0] + input[2].shape[0]):] = 1
+
+
+
+    return (datas_train,ground_truth, datas_test)
 
 if __name__ == "__main__":
     # set Japanese Font
@@ -103,22 +121,30 @@ if __name__ == "__main__":
         bearing1_datas = spliteAcc2fft(accs_bearing1, N, freq)
         gear1_datas = spliteAcc2fft(accs_gear1, N, freq)
 
-        datas_train = np.r_[normal1_datas, bearing1_datas, gear1_datas]
+        datas_train,ground_truth, datas_test =  _init_data([normal1_datas, bearing1_datas, gear1_datas], is_use_data_test = use_data_test, rate = 0.8)
 
         lof_model = create_lof_model(datas_train.shape[0]//3).fit(datas_train)
 
         ground_truth = np.zeros(datas_train.shape[0], dtype=int)
         ground_truth[-(bearing1_datas.shape[0] + gear1_datas.shape[0]):] = 1
 
+        if use_data_test:
+            y_score = -lof_model._decision_function(datas_test)
+        else:
+            y_score = -lof_model.negative_outlier_factor_
         # Compute ROC curve and ROC area for each class
-        fpr, tpr, thresholds = roc_curve(ground_truth, -lof_model.negative_outlier_factor_ )
+        fpr, tpr, thresholds = roc_curve(ground_truth, y_score)
         roc_auc = auc(fpr, tpr)
+        #compute f1_score
+        y_pred = np.zeros(datas_train.shape[0], dtype=int)
+        y_pred[lof_model.negative_outlier_factor_ <= lof_model.threshold_] = 1
+        f1 = f1_score(ground_truth, y_pred)
 
         #select best model with best roc_auc
         if best_roc_auc < roc_auc:
             best_roc_auc = roc_auc
             best_model = lof_model
-        plt.plot(fpr, tpr, lw=2, label='N = %d (area = %0.2f)' % (N, roc_auc))
+        plt.plot(fpr, tpr, lw=2, label='N = %d (area = %0.2f) F1 = %0.2f' % (N, roc_auc, f1))
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -127,45 +153,46 @@ if __name__ == "__main__":
     plt.title('ROC for position 1')
     plt.legend(loc="best")
 
-    # save best model to disk
-    filename = 'finalized_model_1.sav'
-    joblib.dump(best_model, filename)
+    # # save best model to disk
+    # filename = 'finalized_model_1.sav'
+    # joblib.dump(best_model, filename)
 
 
-    # model for position 2
-    plt.figure()
-    for n in range(1 , 10):
-        N = n * 1024
-        normal2_datas = spliteAcc2fft(accs_norma2, N, freq)
-        bearing2_datas = spliteAcc2fft(accs_bearing2, N, freq)
-        gear2_datas = spliteAcc2fft(accs_gear2, N, freq)
-
-        datas_train = np.r_[normal2_datas, bearing2_datas, gear2_datas]
-
-        lof_model = create_lof_model(datas_train.shape[0]//3).fit(datas_train)
-
-        ground_truth = np.zeros(datas_train.shape[0], dtype=int)
-        ground_truth[-(bearing2_datas.shape[0] + gear2_datas.shape[0]):] = 1
-
-        # Compute ROC curve and ROC area for each class
-        fpr, tpr, thresholds = roc_curve(ground_truth, -lof_model.negative_outlier_factor_)
-        roc_auc = auc(fpr, tpr)
-
-        # select best model with best roc_auc
-        if best_roc_auc < roc_auc:
-            best_roc_auc = roc_auc
-            best_model = lof_model
-
-        plt.plot(fpr, tpr, lw=2, label='N = %d (area = %0.2f)' % (N, roc_auc))
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC for position 2')
-    plt.legend(loc="best")
+    # # model for position 2
+    # plt.figure()
+    # for n in range(1 , 10):
+    #     N = n * 1024
+    #     normal2_datas = spliteAcc2fft(accs_norma2, N, freq)
+    #     bearing2_datas = spliteAcc2fft(accs_bearing2, N, freq)
+    #     gear2_datas = spliteAcc2fft(accs_gear2, N, freq)
+    #
+    #     datas_train = np.r_[normal2_datas, bearing2_datas, gear2_datas]
+    #
+    #     lof_model = create_lof_model(datas_train.shape[0]//3).fit(datas_train)
+    #
+    #     ground_truth = np.zeros(datas_train.shape[0], dtype=int)
+    #     ground_truth[-(bearing2_datas.shape[0] + gear2_datas.shape[0]):] = 1
+    #
+    #     # Compute ROC curve and ROC area for each class
+    #     fpr, tpr, thresholds = roc_curve(ground_truth, -lof_model.negative_outlier_factor_)
+    #     roc_auc = auc(fpr, tpr)
+    #     f1 = f1_score(ground_truth, -lof_model.negative_outlier_factor_, average=None)
+    #
+    #     # select best model with best roc_auc
+    #     if best_roc_auc < roc_auc:
+    #         best_roc_auc = roc_auc
+    #         best_model = lof_model
+    #
+    #     plt.plot(fpr, tpr, lw=2, label='N = %d (area = %0.2f) F1 = %0.2f' % (N, roc_auc, f1))
+    # plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    # plt.xlim([0.0, 1.0])
+    # plt.ylim([0.0, 1.05])
+    # plt.xlabel('False Positive Rate')
+    # plt.ylabel('True Positive Rate')
+    # plt.title('ROC for position 2')
+    # plt.legend(loc="best")
     plt.show(block=True)
 
-    # save best model to disk
-    filename = 'finalized_model_2.sav'
-    joblib.dump(best_model, filename)
+    # # save best model to disk
+    # filename = 'finalized_model_2.sav'
+    # joblib.dump(best_model, filename)
