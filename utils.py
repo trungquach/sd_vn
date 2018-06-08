@@ -75,6 +75,20 @@ def spliteAcc2fft(accs, splite_n, fs, timeserial=None, MAX_FREQ=None, is_draw_wa
 
     return datas
 
+# structure: elements in datas must follow order: normalDatas, bearingAlDatas, gearAlDatas
+def split_train_test(datas, labels, frac=0.8):
+    len_normal = np.where(labels == 0)[0].shape[0]
+
+    split_id = int(0.8 * len_normal)
+    train_datas, train_labels = datas[:split_id, :], labels[:split_id]
+    test_datas, test_labels = datas[split_id:, :], labels[split_id:]
+
+    print("Training dataset: ", train_datas.shape)
+    print("Testing dataset: ", test_datas.shape)
+
+    return train_datas, test_datas, train_labels, test_labels
+
+
 # global val
 dataset_path = './data/dataset_2018_04_26/'
 normal_position1_data_path = dataset_path + 'normal_position1/'
@@ -91,19 +105,19 @@ if __name__ == "__main__":
     fp = FontProperties(fname=r'/System/Library/Fonts/ヒラギノ明朝 ProN.ttc', size=9)
 
     accs = merageVm2012Data(normal_position1_data_path + '/' + csv_file_regular_expression)
-    print("Normal position 1 : " , accs.size)
+    print("Normal position 1 : " , accs.shape)
 
     accs = merageVm2012Data(bearing_position1_data_path + '/' + csv_file_regular_expression)
-    print("Bearing position 1 : " , accs.size)
+    print("Bearing position 1 : " , accs.shape)
 
     accs = merageVm2012Data(gear_position1_data_path + '/' + csv_file_regular_expression)
-    print("Gear position 1 : " , accs.size)
+    print("Gear position 1 : " , accs.shape)
 
     accs = merageVm2012Data(normal_position2_data_path + '/' + csv_file_regular_expression)
-    print("Normal position 2 : " , accs.size)
+    print("Normal position 2 : " , accs.shape)
 
     accs = merageVm2012Data(bearing_position2_data_path + '/' + csv_file_regular_expression)
-    print("Bearing position 2 : " , accs.size)
+    print("Bearing position 2 : " , accs.shape)
 
     accs = merageVm2012Data(gear_position2_data_path + '/' + csv_file_regular_expression)
-    print("Gear position 2 : " , accs.size)
+    print("Gear position 2 : " , accs.shape)
