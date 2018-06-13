@@ -7,7 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 class VAE:
     def __init__(self, input_dim, enc_hid_dim, n_enc_layer, latent_dim, dec_hid_dim, n_dec_layer,
-                 init_lr, n_sample, beta, use_batch_norm, **kargs):
+                 init_lr, n_sample, beta, use_batch_norm, init_keep_prob, **kargs):
         self.input_dim = input_dim
 
         self.enc_hid_dim = enc_hid_dim
@@ -23,6 +23,7 @@ class VAE:
 
         self.beta = beta
         self.use_batch_norm = use_batch_norm
+        self.init_keep_prob = init_keep_prob
 
     def batch_normalize(self, data, scope, phase):
 
@@ -39,7 +40,7 @@ class VAE:
     def __build_layer(self, input, input_dim, output_dim, act_func = lambda x: x, name_scope = 'vae_'):
         with tf.variable_scope(name_scope):
             W = tf.get_variable(name='W',shape=[input_dim,output_dim],dtype=tf.float32,
-                                initializer=tf.contrib.layers.xavier_initializer())
+                                initializer=tf.contrib.layers.variance_scaling_initializer())
             b = tf.get_variable(name='b',shape=[output_dim],dtype=tf.float32,initializer=tf.zeros_initializer())
 
             a = act_func(tf.nn.xw_plus_b(input,W,b,name='mul_W_add_b'))
@@ -98,8 +99,10 @@ class VAE:
     def __build_loss(self, input, hat_input, mu, var):
         # reconstruction loss
 
-        recons_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=hat_input, labels=input)
+        recons_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=hat_input, labels=input) # tf.nn
         recons_loss = tf.reduce_sum(recons_loss,axis=1)
+
+        #recons_loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(hat_input,input)),axis=1)) # remember, do we should remove normalize
 
         # kl
         eps = 1e-10
@@ -110,12 +113,13 @@ class VAE:
 
         return recons_loss, kl_loss, vae_loss
 
-    def __build_placeholder(self, input_dim, init_lr):
+    def __build_placeholder(self, input_dim, init_lr, init_keep_prob):
         input = tf.placeholder(name='input',dtype=tf.float32,shape=[None,input_dim])
         lr = tf.placeholder_with_default(input=init_lr,shape=[],name='lr_with_default')
         phase = tf.placeholder_with_default(input=False,shape=[],name='phase_with_default')
+        keep_prob = tf.placeholder_with_default(input=init_keep_prob,shape=[],name='keep_prob_with_default')
 
-        return input, lr, phase
+        return input, lr, phase, keep_prob
 
     def build_normalize(self, train_data):
         self.scaler = MinMaxScaler()
@@ -140,7 +144,8 @@ class VAE:
 
     def get_decoded_output(self, datas):
         feed_dict = {
-            self.input: datas
+            self.input: datas,
+            self.keep_prob: 1.0
         }
 
         decoded_output = self.sess.run(self.decoded_output, feed_dict=feed_dict)
@@ -155,10 +160,14 @@ class VAE:
 
     def build(self):
         # build necessary placeholders
-        self.input, self.lr, self.phase = self.__build_placeholder(input_dim=self.input_dim, init_lr=self.init_lr)
+        self.input, self.lr, self.phase, self.keep_prob = self.__build_placeholder(input_dim=self.input_dim, init_lr=self.init_lr,
+                                                                                   init_keep_prob=self.init_keep_prob)
+
+        # adding noise
+        self.noise_input = tf.nn.dropout(x=self.input,keep_prob=self.keep_prob,name='adding_noise')
 
         # encoder == approximate q(z|X)
-        self.mu, self.var = self.__build_encoder(input=self.input,input_dim=self.input_dim,enc_hid_dim=self.enc_hid_dim,
+        self.mu, self.var = self.__build_encoder(input=self.noise_input,input_dim=self.input_dim,enc_hid_dim=self.enc_hid_dim,
                                                      n_enc_layer=self.n_enc_layer,latent_dim=self.latent_dim)
 
 
@@ -170,7 +179,7 @@ class VAE:
         self.hat_input = self.__build_decoder(input=self.zs,input_dim=self.latent_dim,latent_dim=self.input_dim,
                                               dec_hid_dim=self.dec_hid_dim, n_dec_layer=self.n_dec_layer)
 
-        self.decoded_output = tf.nn.sigmoid(self.hat_input)
+        self.decoded_output = tf.nn.sigmoid(self.hat_input) #self.hat_input #tf.nn.sigmoid(self.hat_input)
 
         # loss
         self.recons_loss, self.kl_loss, self.vae_loss = self.__build_loss(input=self.input,hat_input=self.hat_input,
@@ -185,8 +194,6 @@ class VAE:
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
-
-
 
 if __name__ == '__main__':
     # test
@@ -205,10 +212,11 @@ if __name__ == '__main__':
     n_sample = 2
     beta = 0.0
     use_batch_norm = False
+    init_keep_prob = 0.8
 
     vae = VAE(input_dim=input_dim, enc_hid_dim=enc_hid_dim, n_enc_layer=n_enc_layer, latent_dim=latent_dim,
               dec_hid_dim=dec_hid_dim, n_dec_layer=n_dec_layer, init_lr=init_lr, n_sample=n_sample, beta=beta,
-              use_batch_norm=use_batch_norm)
+              use_batch_norm=use_batch_norm, init_keep_prob=init_keep_prob)
 
     vae.build()
 

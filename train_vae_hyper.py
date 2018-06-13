@@ -104,8 +104,8 @@ class HyperVAE(NeighborsBase, KNeighborsMixin, UnsupervisedMixin):
         """
         Train
         """
-        self.best_test_score, _ = train_vae.train(vae=vae, mini_batchs=mini_batchs, test_data=norm_valid_datas,
-                                                  test_label=valid_labels, save_out_model=None, n_epoch=30)
+        self.best_test_score, _ = train_vae.train(vae=vae, mini_batchs=mini_batchs, valida_data=norm_valid_datas,
+                                                  valida_label=valid_labels, save_out_model=None, n_epoch=30)
         # self.best_test_score, _ = train_vae.train(vae=vae, mini_batchs=mini_batchs, test_data=norm_valid_datas,
         #                         test_label=valid_labels,save_out_model=os.path.join(self.save_candidate_folder, 'vae_tensor.ckpt'))
 
@@ -170,7 +170,8 @@ if __name__ == "__main__":
         "init_lr": [0.001],
         "n_sample": [2],  # not used yet
         "beta": [0.5,0,1],
-        "use_batch_norm":[False,True]
+        "use_batch_norm":[False,True],
+        "init_keep_prob": [0.8]
     }
 
     """
@@ -227,8 +228,8 @@ if __name__ == "__main__":
     Train
     """
     save_out_model = os.path.join(save_vae_hyper_folder, 'vae_tensor.ckpt')
-    _, threshold = train_vae.train(vae=vae, mini_batchs=mini_batchs, test_data=test_norm_datas, test_label=test_labels,
-                         save_out_model=save_out_model, n_epoch=200)  # 1
+    _, threshold = train_vae.train(vae=vae, mini_batchs=mini_batchs, valida_data=test_norm_datas, valida_label=test_labels,
+                                   save_out_model=save_out_model, n_epoch=200)  # 1
 
     """
     Testing
